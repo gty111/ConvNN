@@ -141,7 +141,7 @@ class DataSet{
             }
             printf("\n");
         }
-        printf("%d\n",label[idx_item]);
+        printf("Label: %d\n",label[idx_item]);
     }
 
     template<typename TT>
@@ -359,10 +359,10 @@ class NN{
     Tensor<T> H; // 128
     Tensor<T> I; // 10
     Tensor<T> J; // 10
-    Tensor<T> K; // 10
+    Tensor<T> OUTPUT; // 10
 
-    // cal detb
-    Tensor<T> detcPad; // 64x28x28
+    // to cal B grad
+    Tensor<T> CgradPad; // 64x28x28
 
     NN(double mean,double std,double learn_rate){
         
@@ -400,16 +400,16 @@ class NN{
         H.init(128);
         I.init(10);
         J.init(10);
-        K.init(10);
+        OUTPUT.init(10);
 
-        // cal detb
-        detcPad.init(16,28,28);
+        // to cal B grad
+        CgradPad.init(16,28,28);
     }
 
     void backward(int label){
         assert(label>=0&&label<=9);
 
-        // ----detj----
+        // ----J grad----
         T maximum = J.max();
 
         T sum = 0;
@@ -423,12 +423,12 @@ class NN{
                 - std::exp(*J.data(i)-maximum) / sum  ;
         }
 
-        // ----deti----
+        // ----I grad----
         for(int i=0;i<I.shape[0];i++){
             *I.grad(i) = *I.data(i)>0 ? *J.grad(i) : 0;
         }
 
-        // ----deth----
+        // ----H grad----
         for(int i=0;i<fc2w.shape[0];i++){
             T sum = 0;
             for(int j=0;j<fc2w.shape[1];j++){
@@ -437,24 +437,24 @@ class NN{
             *H.grad(i) = sum;
         }
 
-        // ----detg----
+        // ----G grad----
         for(int i=0;i<G.shape[0];i++){
             *G.grad(i) = *G.data(i)>0 ? *H.grad(i) : 0;
         }
 
-        // ----fc2w----
+        // ----fc2w grad----
         for(int i=0;i<fc2w.shape[0];i++){
             for(int j=0;j<fc2w.shape[1];j++){
                 *fc2w.data(i,j) += (*H.data(i)) * (*I.grad(j)) * learn_rate;
             }
         }
 
-        // ----fc2b----
+        // ----fc2b grad----
         for(int i=0;i<fc2b.shape[0];i++){
             *fc2b.data(i) += (*I.grad(i)) * learn_rate;
         }
 
-        // ----detf----
+        // ----F grad----
         for(int i=0;i<F.shape[0];i++){
             T sum = 0;
             for(int j=0;j<G.shape[0];j++){
@@ -463,19 +463,19 @@ class NN{
             *F.grad(i) = sum;
         }
         
-        // ----fc1w----
+        // ----fc1w grad----
         for(int i=0;i<fc1w.shape[0];i++){
             for(int j=0;j<fc1w.shape[1];j++){
                 *fc1w.data(i,j) += (*G.grad(j)) * (*F.data(i)) * learn_rate;
             }
         }
 
-        // ----fc1b----
+        // ----fc1b grad----
         for(int i=0;i<fc1b.shape[0];i++){
             *fc1b.data(i) += (*G.grad(i)) * learn_rate;
         }
 
-        // ----dete----
+        // ----E grad----
         for(int i=0;i<E.shape[0];i++){
             for(int j=0;j<E.shape[1];j++){
                 for(int k=0;k<E.shape[2];k++){
@@ -484,7 +484,7 @@ class NN{
             }
         }
 
-        // ----detd----
+        // ----D grad----
         for(int i=0;i<D.shape[0];i++){
             for(int j=0;j<D.shape[1];j++){
                 for(int k=0;k<D.shape[2];k++){
@@ -493,7 +493,7 @@ class NN{
             }
         }
 
-        // ----detc----
+        // ----C grad----
         for(int i=0;i<C.shape[0];i++){
             for(int j=0;j<C.shape[1];j++){
                 for(int k=0;k<C.shape[2];k++){
@@ -502,11 +502,11 @@ class NN{
             }
         }
 
-        // ----detb----
+        // ----B grad----
         for(int i=0;i<C.shape[0];i++){
             for(int j=0;j<C.shape[1];j++){
                 for(int k=0;k<C.shape[2];k++){
-                    *detcPad.data(i,j+2,k+2) = *C.grad(i,j,k);
+                    *CgradPad.data(i,j+2,k+2) = *C.grad(i,j,k);
                 }
             }
         }
@@ -517,7 +517,7 @@ class NN{
                     for(int m=0;m<conv2.shape[0];m++){
                         for(int p=0;p<conv2.shape[2];p++){
                             for(int q=0;q<conv2.shape[3];q++){
-                                sum += *detcPad.data(m,j+p,k+q) * (*conv2.data(m,i,2-p,2-q));
+                                sum += *CgradPad.data(m,j+p,k+q) * (*conv2.data(m,i,2-p,2-q));
                             }
                         }
                     }
@@ -528,7 +528,7 @@ class NN{
 
         
 
-        // ----conv2----
+        // ----conv2 grad----
         for(int i=0;i<conv2.shape[0];i++){
             for(int j=0;j<conv2.shape[1];j++){
                 for(int p=0;p<conv2.shape[2];p++){
@@ -546,7 +546,7 @@ class NN{
         }
 
 
-        // ----convb2----
+        // ----convb2 grad----
         for(int i=0;i<C.shape[0];i++){
             for(int j=0;j<C.shape[1];j++){
                 for(int k=0;k<C.shape[2];k++){
@@ -555,7 +555,7 @@ class NN{
             }
         }
 
-        // ----deta----
+        // ----A grad----
         for(int i=0;i<A.shape[0];i++){
             for(int j=0;j<A.shape[1];j++){
                 for(int k=0;k<A.shape[2];k++){
@@ -564,7 +564,7 @@ class NN{
             }
         }
 
-        // ----conv1----
+        // ----conv1 grad----
         for(int i=0;i<conv1.shape[0];i++){
             for(int p=0;p<conv1.shape[1];p++){
                 for(int j=0;j<conv1.shape[2];j++){
@@ -581,7 +581,7 @@ class NN{
             }
         }
 
-        // ----convb1----
+        // ----convb1 grad----
         for(int i=0;i<A.shape[0];i++){
             T sum = 0;
             for(int j=0;j<A.shape[1];j++){
@@ -688,7 +688,7 @@ class NN{
     }
 
     void forward(){
-        // input 1x28x28
+        // INPUT 1x28x28
         conv(A,INPUT,conv1,convb1); // conv1 16x1x3x3 convb1 16
         // A 16x26x26
         relu(B,A); 
@@ -709,8 +709,8 @@ class NN{
         // I 10
         relu(J,I);
         // J 10
-        logSoftmax(K,J); 
-        // K 10
+        logSoftmax(OUTPUT,J); 
+        // OUTPUT 10
     }
 
     void train(DataSet<T> &trainSet,DataSet<T> testSet,
@@ -721,7 +721,7 @@ class NN{
         printf("ImageNum:%d\n",num);
 
         double loss = 0;
-        double corr_rate,corr_rate_l=0;
+        // double corr_rate,corr_rate_l=0;
         int learn_interval = 1200;
         int interval = 240,idx;
 
@@ -736,20 +736,21 @@ class NN{
             }
             
             if((i+1)%learn_interval==0){
-                corr_rate = validate(testSet,test_r,testSet.items_num);
-            //     if(corr_rate>0.99)goto Ret;
-            //     if(corr_rate<corr_rate_l){
-            //         learn_rate *= 0.5;
-            //         if(learn_rate<1e-6)goto Ret;
-            //         printf("Learn_rate:%.12lf\n",learn_rate);
-            //     }
-            //     corr_rate_l = corr_rate;
+                validate(testSet,test_r,1200);
+                // corr_rate = validate(testSet,test_r,testSet.items_num);
+                // if(corr_rate>0.99)goto Ret;
+                // if(corr_rate<corr_rate_l){
+                //     learn_rate *= 0.5;
+                //     if(learn_rate<1e-6)goto Ret;
+                //     printf("Learn_rate:%.12lf\n",learn_rate);
+                // }
+                // corr_rate_l = corr_rate;
             }
-            loss += *K.data(trainSet.label[idx]);
+            loss += *OUTPUT.data(trainSet.label[idx]);
             backward(trainSet.label[idx]);
         }
-    Ret:
-        corr_rate = validate(testSet,test_r,testSet.items_num);
+    // Ret:
+        // validate(testSet,test_r,testSet.items_num);
     }
 
     T validate(DataSet<T> &test,Random &r,int num){
@@ -758,7 +759,7 @@ class NN{
             idx = r.next();
             INPUT.set(test.image(idx,0,0));
             forward();
-            if(K.maxIdx()==test.label[idx])correct++;
+            if(OUTPUT.maxIdx()==test.label[idx])correct++;
         }
         T corr_rate = (T)correct / num;
         printf("Acc on TestSet(%d): %.2f%%\n",num,corr_rate*100);
@@ -775,7 +776,7 @@ class NN{
             INPUT.set(dataSet.image(idx,0,0));
             forward();
             J.print();
-            printf("Pred:%d\n",K.maxIdx());
+            printf("Predict: %d\n",OUTPUT.maxIdx());
         }   
     }
 };
@@ -793,7 +794,13 @@ int main(){
 
     Random train_r(trainSet.items_num),test_r(testSet.items_num);
 
+    #ifdef SHOW
+    nn.train(trainSet,testSet,train_r,test_r,9600);
+    #else
     nn.train(trainSet,testSet,train_r,test_r,trainSet.items_num);
-    
-    // nn.show(trainSet,train_r);
+    #endif
+
+    #ifdef SHOW
+    nn.show(trainSet,train_r);
+    #endif
 }

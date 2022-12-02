@@ -5,7 +5,7 @@ DATA = data
 
 run:
 	$(shell [ ! -d $(BIN) ] && mkdir $(BIN) )
-	@g++ -O3 -Wall -Wextra $(SRC)/$(APP).cpp -o $(BIN)/$(APP)
+	@g++ $(CXXFLAG) -O3 -Wall -Wextra $(SRC)/$(APP).cpp -o $(BIN)/$(APP)
 	@$(BIN)/$(APP) | tee log
 
 data:
