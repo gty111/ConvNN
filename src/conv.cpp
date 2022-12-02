@@ -8,28 +8,42 @@
 #include<random>
 #include<algorithm>
 #include<cfloat>
+#include<iostream>
 
 #define SEED 0
 
 std::random_device rd;  //Will be used to obtain a seed for the random number engine
 std::mt19937 gen(SEED); //Standard mersenne_twister_engine seeded with rd()
 
-
-template<typename T>
-T flip(T input){
-    size_t size = sizeof(T);
-    T ret = 0;
-    for(int i=0;i<size;i++){
-        ret += ((input>>(i*8)) & 0xFF)<<((size-i-1)*8);
+class Random{
+    public:
+    int *_arr;
+    int _idx,_size;
+    Random(int size){
+        _arr = (int *)malloc(size*sizeof(int));
+        for(int i=0;i<size;i++){
+            _arr[i] = i;
+        }
+        std::shuffle(_arr , _arr+size , gen);
+        _idx = -1;
+        _size = size;
     }
-    return ret;
-}
+
+    int next(){
+        _idx = (_idx+1) % _size;
+        return _arr[_idx];
+    }
+
+    ~Random(){
+        free(_arr);
+    }
+};
 
 template<typename T>
 class DataSet{
     public:
     std::string imagePath,labelPath;
-    unsigned rows,cols,items_num;
+    int rows,cols,items_num;
     T *_image;
     uint8_t *_image_byte;
     uint8_t *label;
@@ -53,15 +67,15 @@ class DataSet{
         this->labelPath = labelPath;
 
         FILE *fp;
-        unsigned magic_num,label_items_num;
+        int magic_num,label_items_num;
         // read _image
         fp = fopen(imagePath.c_str(),"r");
         assert(fp);
 
-        fread(&magic_num,sizeof(unsigned),1,fp);
-        fread(&items_num,sizeof(unsigned),1,fp);
-        fread(&rows,sizeof(unsigned),1,fp);
-        fread(&cols,sizeof(unsigned),1,fp);
+        fread(&magic_num,sizeof(int),1,fp);
+        fread(&items_num,sizeof(int),1,fp);
+        fread(&rows,sizeof(int),1,fp);
+        fread(&cols,sizeof(int),1,fp);
 
         magic_num = flip<unsigned>(magic_num);
         items_num = flip<unsigned>(items_num);
@@ -128,6 +142,16 @@ class DataSet{
             printf("\n");
         }
         printf("%d\n",label[idx_item]);
+    }
+
+    template<typename TT>
+    TT flip(TT input){
+        int size = sizeof(TT);
+        TT ret = 0;
+        for(int i=0;i<size;i++){
+            ret += ((input>>(i*8)) & 0xFF)<<((size-i-1)*8);
+        }
+        return ret;
     }
 };
 
@@ -590,7 +614,7 @@ class NN{
                             }    
                         }
                     }
-                    *output.data(i,m,n) = sum;
+                    *output.data(i,m,n) = sum + (*bias.data(i));
                 }
             }
         }
@@ -665,19 +689,19 @@ class NN{
 
     void forward(){
         // input 1x28x28
-        conv(A,INPUT,conv1,convb1); // conv1 32x1x3x3 convb1 32
-        // A 32x26x26
+        conv(A,INPUT,conv1,convb1); // conv1 16x1x3x3 convb1 16
+        // A 16x26x26
         relu(B,A); 
-        // B 32x26x26
-        conv(C,B,conv2,convb2); // conv2 64x32x3x3 convb2 64
-        // C 64x24x24
+        // B 16x26x26
+        conv(C,B,conv2,convb2); // conv2 16x16x3x3 convb2 16
+        // C 16x24x24
         relu(D,C);
-        // D 64x24x24
+        // D 16x24x24
         meanPool(E,D); // meanPool 2x2
-        // E 64x12x12
+        // E 16x12x12
         flattern(F,E);
-        // F 9216
-        fc(G,F,fc1w,fc1b); // fc1w 9216x128 fc1b 128
+        // F 2304
+        fc(G,F,fc1w,fc1b); // fc1w 2304x128 fc1b 128
         // G 128
         relu(H,G); 
         // H 128
@@ -688,111 +712,88 @@ class NN{
         logSoftmax(K,J); 
         // K 10
     }
-};
 
-class Random{
-    public:
-    int *_arr;
-    int _idx,_size;
-    Random(int size){
-        _arr = (int *)malloc(size*sizeof(int));
-        for(int i=0;i<size;i++){
-            _arr[i] = i;
-        }
-        std::shuffle(_arr , _arr+size , gen);
-        _idx = -1;
-        _size = size;
-    }
-
-    int next(){
-        _idx = (_idx+1) % _size;
-        return _arr[_idx];
-    }
-
-    ~Random(){
-        free(_arr);
-    }
-};
-
-template<typename T>
-double validate(DataSet<T> &test,NN<T> &nn,Random &test_idx,int num){
-    int correct = 0,idx;
-    for(int i=0;i<num;i++){
-        idx = test_idx.next();
-        nn.INPUT.set(test.image(idx,0,0));
-        nn.forward();
-        if(nn.K.maxIdx()==test.label[idx])correct++;
-    }
-    double corr_rate = (double)correct / num;
-    printf("Acc on TestSet(%d): %.2f%%\n",num,corr_rate*100);
-    return corr_rate;
-}
-
-template<typename T>
-void train(NN<T> &nn,DataSet<T> &trainSet,DataSet<T> testSet,
-    Random &train_r,Random &test_r,int num){
-    
-    printf("Seed:%d\n",SEED);
-    printf("Lr:%f\n",nn.learn_rate);
-    printf("ImageNum:%d\n",num);
-
-    double loss = 0,corr_rate,corr_rate_l=0;
-    int interval = 240,learn_interval = 1200,idx;
-
-    for(int i=0;i<num;i++){
-        idx = train_r.next();
-        nn.INPUT.set(trainSet.image(idx,0,0));
-        nn.forward();
-        if((i+1)%interval==0){
-            loss /= interval;
-            printf("[%5d/%-5d] Loss: %5.6f\n",i+1,num,loss);
-            loss = 0;
-        }
+    void train(DataSet<T> &trainSet,DataSet<T> testSet,
+        Random &train_r,Random &test_r,int num){
         
-        if((i+1)%learn_interval==0){
-            corr_rate = validate<double>(testSet,nn,test_r,1200);
-            // if(corr_rate>0.99)goto Ret;
-            // if(corr_rate<corr_rate_l){
-            //     nn.learn_rate *= 0.9;
-            //     if(nn.learn_rate<1e-6)goto Ret;
-            //     printf("Learn_rate:%.12lf\n",nn.learn_rate);
-            // }
-            corr_rate_l = corr_rate;
-        }
-        loss += *nn.K.data(trainSet.label[idx]);
-        nn.backward(trainSet.label[idx]);
-    }
-Ret:
-    corr_rate = validate(testSet,nn,test_r,testSet.items_num);
-}
+        printf("Seed:%d\n",SEED);
+        printf("Lr:%f\n",learn_rate);
+        printf("ImageNum:%d\n",num);
 
-template<typename T>
-void show(NN<T> &nn,DataSet<T> &dataSet,Random &r){
-    int idx;
-    while(1){
-        idx = r.next();
-        dataSet.printIdx(idx);
-        nn.INPUT.set(dataSet.image(idx,0,0));
-        nn.forward();
-        nn.J.print();
-        printf("Pred:%d\n",nn.K.maxIdx());
-        getchar();
-    }   
-}
+        double loss = 0;
+        double corr_rate,corr_rate_l=0;
+        int learn_interval = 1200;
+        int interval = 240,idx;
+
+        for(int i=0;i<num;i++){
+            idx = train_r.next();
+            INPUT.set(trainSet.image(idx,0,0));
+            forward();
+            if((i+1)%interval==0){
+                loss /= interval;
+                printf("[%5d/%-5d] Loss: %5.6f\n",i+1,num,loss);
+                loss = 0;
+            }
+            
+            if((i+1)%learn_interval==0){
+                corr_rate = validate(testSet,test_r,testSet.items_num);
+            //     if(corr_rate>0.99)goto Ret;
+            //     if(corr_rate<corr_rate_l){
+            //         learn_rate *= 0.5;
+            //         if(learn_rate<1e-6)goto Ret;
+            //         printf("Learn_rate:%.12lf\n",learn_rate);
+            //     }
+            //     corr_rate_l = corr_rate;
+            }
+            loss += *K.data(trainSet.label[idx]);
+            backward(trainSet.label[idx]);
+        }
+    Ret:
+        corr_rate = validate(testSet,test_r,testSet.items_num);
+    }
+
+    T validate(DataSet<T> &test,Random &r,int num){
+        int correct = 0,idx;
+        for(int i=0;i<num;i++){
+            idx = r.next();
+            INPUT.set(test.image(idx,0,0));
+            forward();
+            if(K.maxIdx()==test.label[idx])correct++;
+        }
+        T corr_rate = (T)correct / num;
+        printf("Acc on TestSet(%d): %.2f%%\n",num,corr_rate*100);
+        return corr_rate;
+    }
+
+    void show(DataSet<T> &dataSet,Random &r){
+        int idx;
+        while(1){
+            printf("PRESS ENTER ...\n");
+            getchar();
+            idx = r.next();
+            dataSet.printIdx(idx);
+            INPUT.set(dataSet.image(idx,0,0));
+            forward();
+            J.print();
+            printf("Pred:%d\n",K.maxIdx());
+        }   
+    }
+};
 
 
 int main(){
-    DataSet<float> trainSet,testSet;
+    setbuf(stdout, NULL);
+    DataSet<double> trainSet,testSet;
     printf("loading data...\n");
     trainSet.init("data/train-images-idx3-ubyte","data/train-labels-idx1-ubyte");
     testSet.init("data/t10k-images-idx3-ubyte","data/t10k-labels-idx1-ubyte");
 
     printf("init NN...\n");
-    NN<float> nn(0,0.1,5e-3);
+    NN<double> nn(0,0.1,5e-3);
 
     Random train_r(trainSet.items_num),test_r(testSet.items_num);
 
-    train<float>(nn,trainSet,testSet,train_r,test_r,trainSet.items_num);
+    nn.train(trainSet,testSet,train_r,test_r,trainSet.items_num);
     
-    // show<double>(nn,trainSet,train_r);
+    // nn.show(trainSet,train_r);
 }
