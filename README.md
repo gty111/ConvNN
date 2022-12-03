@@ -4,7 +4,7 @@
 
 - **Not dependent on any machine learning framework**
 
-- Achieve about 98% accuracy rate on test set after an epoch about ten minutes
+- Achieve about 98% accuracy rate on test set after an epoch about 7 minutes
 
 - With simple commands, you can reproduce above-mentioned result or just play with it
 
