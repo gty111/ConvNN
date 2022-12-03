@@ -8,6 +8,10 @@
 
 - With simple commands, you can reproduce above-mentioned result or just play with it
 
+## Doc
+
+[You can find document about this repo from here.](https://gty111.github.io/doc/A%20Convolutional%20Neural%20Network%20without%20AI.pdf)
+
 ## Prepare Data Set
 
 ```
