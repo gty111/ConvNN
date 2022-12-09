@@ -19,14 +19,14 @@ class Tensor{
         }
     }
 
-    void init(int a){
+    Tensor(int a){
         shape.push_back(a);
         size = a;
         _data = (T*)calloc(size,sizeof(T));
         _grad = (T*)calloc(size,sizeof(T));
     }
 
-    void init(int a,int b){
+    Tensor(int a,int b){
         shape.push_back(a);
         shape.push_back(b);
         size = a * b;
@@ -34,7 +34,7 @@ class Tensor{
         _grad = (T*)calloc(size,sizeof(T));
     }
 
-    void init(int a,int b,int c){
+    Tensor(int a,int b,int c){
         shape.push_back(a);
         shape.push_back(b);
         shape.push_back(c);
@@ -43,7 +43,7 @@ class Tensor{
         _grad = (T*)calloc(size,sizeof(T));
     }
 
-    void init(int a,int b,int c,int d){
+    Tensor(int a,int b,int c,int d){
         shape.push_back(a);
         shape.push_back(b);
         shape.push_back(c);
@@ -80,58 +80,74 @@ class Tensor{
     }
 
     T* data(int idx0){
+        #ifdef DEBUG
         assert(shape.size()==1);
         assert(idx0>=0&&idx0<shape[0]);
+        #endif
         return &_data[idx0];
     }
     T* data(int idx0,int idx1){
+        #ifdef DEBUG
         assert(shape.size()==2);
         assert(idx0>=0&&idx0<shape[0]);
         assert(idx1>=0&&idx1<shape[1]);
+        #endif
         return &_data[idx0*shape[1]+idx1];
     }
     T* data(int idx0,int idx1,int idx2){
+        #ifdef DEBUG
         assert(shape.size()==3);
         assert(idx0>=0&&idx0<shape[0]);
         assert(idx1>=0&&idx1<shape[1]);
         assert(idx2>=0&&idx2<shape[2]);
+        #endif
         return &_data[idx0*shape[1]*shape[2]+idx1*shape[2]+idx2];
     }
 
     T* data(int idx0,int idx1,int idx2,int idx3){
+        #ifdef DEBUG
         assert(shape.size()==4);
         assert(idx0>=0&&idx0<shape[0]);
         assert(idx1>=0&&idx1<shape[1]);
         assert(idx2>=0&&idx2<shape[2]);
         assert(idx3>=0&&idx3<=shape[3]);
+        #endif
         return &_data[idx0*shape[1]*shape[2]*shape[3]+idx1*shape[2]*shape[3]+idx2*shape[3]+idx3];
     }
 
     T* grad(int idx0){
+        #ifdef DEBUG
         assert(shape.size()==1);
         assert(idx0>=0&&idx0<shape[0]);
+        #endif
         return &_grad[idx0];
     }
     T* grad(int idx0,int idx1){
+        #ifdef DEBUG
         assert(shape.size()==2);
         assert(idx0>=0&&idx0<shape[0]);
         assert(idx1>=0&&idx1<shape[1]);
+        #endif
         return &_grad[idx0*shape[1]+idx1];
     }
     T* grad(int idx0,int idx1,int idx2){
+        #ifdef DEBUG
         assert(shape.size()==3);
         assert(idx0>=0&&idx0<shape[0]);
         assert(idx1>=0&&idx1<shape[1]);
         assert(idx2>=0&&idx2<shape[2]);
+        #endif
         return &_grad[idx0*shape[1]*shape[2]+idx1*shape[2]+idx2];
     }
 
     T* grad(int idx0,int idx1,int idx2,int idx3){
+        #ifdef DEBUG
         assert(shape.size()==4);
         assert(idx0>=0&&idx0<shape[0]);
         assert(idx1>=0&&idx1<shape[1]);
         assert(idx2>=0&&idx2<shape[2]);
         assert(idx3>=0&&idx3<=shape[3]);
+        #endif
         return &_grad[idx0*shape[1]*shape[2]*shape[3]+idx1*shape[2]*shape[3]+idx2*shape[3]+idx3];
     }
 
@@ -171,8 +187,31 @@ class Tensor{
             for(int j=0;j<shape[0];j++){
                 printf("% 5.6f\n",*(data(j)));
             }
-        }
-        
+        } 
+    }
+
+    void printgrad(){
+        printf("---------------\n");
+        if(shape.size()==3){
+            // for(int k=0;k<shape[0];k++)
+            for(int i=0;i<shape[1];i++){
+                for(int j=0;j<shape[2];j++){
+                    printf("% 5.6f ",*(grad(0,i,j)));
+                }
+                printf("\n");
+            }
+        }else if(shape.size()==2){
+            for(int i=0;i<shape[0];i++){
+                for(int j=0;j<shape[1];j++){
+                    printf("% 5.6f ",*(grad(i,j)));
+                }
+                printf("\n");
+            }
+        }else if(shape.size()==1){
+            for(int j=0;j<shape[0];j++){
+                printf("% 5.6f\n",*(grad(j)));
+            }
+        } 
     }
 
     ~Tensor(){

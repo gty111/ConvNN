@@ -2,14 +2,22 @@ APP = conv
 SRC = src
 BIN = bin
 DATA = data
+FLAG = -I include -O3 -Wall -Wextra $^ -o $(BIN)/$@ 
 
 mnist: $(SRC)/mnist.cpp
-	$(shell [ ! -d $(BIN) ] && mkdir $(BIN) )
-	@g++ $(CXXFLAG) -O3 -Wall -Wextra $^ -o $(BIN)/$@
+	@g++ $(CXXFLAG) $(FLAG)
+	@$(BIN)/$@ | tee log
+
+Dmnist: $(SRC)/mnist.cpp
+	@g++ -g -D DEBUG $(CXXFLAG) $(FLAG)
 	@$(BIN)/$@ | tee log
 
 cifar: $(SRC)/cifar.cpp
-	@g++ $(CXXFLAG) -O3 -Wall -Wextra $^ -o $(BIN)/$@
+	@g++ $(CXXFLAG) $(FLAG)
+	@$(BIN)/$@ | tee log
+
+Dcifar: $(SRC)/cifar.cpp
+	@g++ -g -D DEBUG $(CXXFLAG) $(FLAG)
 	@$(BIN)/$@ | tee log
 
 data:
@@ -27,4 +35,4 @@ data:
 
 clean:
 	@rm -rf data bin
-.PHONY: data mnist cifar clean 
+.PHONY: data mnist cifar clean test_layer

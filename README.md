@@ -1,12 +1,16 @@
-# Convolutional Neural Network(ConvNN) to Solve MNIST
+# A DNN training framework
+
+> just for study 
 
 ## Features
 
-- **Not dependent on any machine learning framework**
+- A simple DNN training framework without any existing machine learning framework
 
-- Achieve about 98% accuracy rate on test set after an epoch about 7 minutes
+- You can build DNN like building blocks through this framework
 
-- With simple commands, you can reproduce above-mentioned result or just play with it
+- I provide two examples(One is on MNIST,the other is on CIFAR-10) to build ConvNN through this framework 
+
+
 
 ## Doc
 
@@ -22,28 +26,14 @@ make data
 
 > At each run, the standard output will be recorded in the `log` file
 
-### To reproduce result
-
-> To accelrate, only 1200 images were tested at each time
+### MNIST
 
 ```
-make
+make mnist
 ```
 
-### To play with it
+### CIFAR-10
+
 ```
-make CXXFLAG=-DSHOW
+make cifar
 ```
-After training, you can press enter and you will see the hand-written number, predicted result and output of `J` layer which represents the probability of each number.
-
-![](pic/PLAY.png)
-
-## Structure of ConvNN
-
-![](pic/NN.png)
-
-## Eval About Training CovNN
-
-![](pic/ACC.png)
-
-![](pic/LOSS.png)
