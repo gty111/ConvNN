@@ -46,6 +46,7 @@ void train(DataSet &trainSet,DataSet testSet,
         if((i+1)%learn_interval==0){
             valid(testSet,test_r,1200);
         }
+        nn.apply_grad();
     }
 }
 

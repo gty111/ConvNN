@@ -17,6 +17,12 @@ public:
         return layers.back()->_out;
     }
 
+    void apply_grad(){
+        for(auto e:layers){
+            e->apply_grad();
+        }
+    }
+
     int pred(){
         auto layer = (LogSoftmax*)layers.back();
         return layer->_out->maxIdx();

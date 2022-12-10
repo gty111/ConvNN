@@ -29,6 +29,7 @@ void train(DataSet &data,
     double loss = 0;
     int learn_interval = 5000;
     int interval = 500;
+    int grad_interval = 1;
 
     for(int i=0;i<num;i++){
         int index = train_r.next();
@@ -46,7 +47,10 @@ void train(DataSet &data,
         if((i+1)%learn_interval==0){
             nn.lr *= 0.98;
             nn.setLR(nn.lr);
-            valid(data,test_r,10000);
+            valid(data,test_r,500);
+        }
+        if((i+1)%grad_interval==0){
+            nn.apply_grad();
         }
     }
 }
@@ -71,7 +75,7 @@ int main(){
     nn.add(new Relu(nn.lastOut()));
     nn.add(new LogSoftmax(nn.lastOut(),&label));
 
-    nn.setLR(5e-3);
+    nn.setLR(1e-3);
 
     nn.initData(0,0.1);
 

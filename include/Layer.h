@@ -17,6 +17,21 @@ public:
         if(_b)_w->initData(mean,std);
     }
 
+    virtual void apply_grad(){
+        if(_w){
+            for(int i=0;i<(*_w).size;i++){
+                (*_w)._data[i] += (*_w)._grad[i];
+                (*_w)._grad[i] = 0;
+            }
+        }
+        if(_b){
+            for(int i=0;i<(*_b).size;i++){
+                (*_b)._data[i] += (*_b)._grad[i];
+                (*_b)._grad[i] = 0;
+            }
+        }
+    }
+
     virtual void check() = 0;
     virtual void forward() = 0;
     virtual void backward() = 0;
@@ -127,7 +142,7 @@ public:
                                 sum += *(*_in).data(j,m+p,n+q) * (*(*_out).grad(i,m,n));
                             }
                         }
-                        *(*_w).data(i,j,p,q) += sum * this->learn_rate;
+                        *(*_w).grad(i,j,p,q) += sum * this->learn_rate;
                     }
                 }
             }
@@ -137,7 +152,7 @@ public:
         for(int i=0;i<(*_out).shape[0];i++){
             for(int j=0;j<(*_out).shape[1];j++){
                 for(int k=0;k<(*_out).shape[2];k++){
-                    *(*_b).data(i) += *(*_out).grad(i,j,k) * this->learn_rate;    
+                    *(*_b).grad(i) += *(*_out).grad(i,j,k) * this->learn_rate;    
                 }
             }
         }
@@ -202,13 +217,13 @@ public:
         // ----_w grad----
         for(int i=0;i<(*_w).shape[0];i++){
             for(int j=0;j<(*_w).shape[1];j++){
-                *(*_w).data(i,j) += (*(*_out).grad(j)) * (*(*_in).data(i)) * this->learn_rate;
+                *(*_w).grad(i,j) += (*(*_out).grad(j)) * (*(*_in).data(i)) * this->learn_rate;
             }
         }
 
         // ----_b grad----
         for(int i=0;i<(*_b).shape[0];i++){
-            *(*_b).data(i) += (*(*_out).grad(i)) * this->learn_rate;
+            *(*_b).grad(i) += (*(*_out).grad(i)) * this->learn_rate;
         }
     }
 };
