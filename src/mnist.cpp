@@ -26,8 +26,9 @@ void train(DataSet &trainSet,DataSet testSet,
         Random &train_r,Random &test_r,int num){
     
     double loss = 0;
-    int learn_interval = 1200;
-    int interval = 240;
+    int learn_interval = 2048;
+    int interval = 128;
+    int batch_size = 64;
 
     for(int i=0;i<num;i++){
         int index = train_r.next();
@@ -46,7 +47,10 @@ void train(DataSet &trainSet,DataSet testSet,
         if((i+1)%learn_interval==0){
             valid(testSet,test_r,1200);
         }
-        nn.apply_grad();
+        if((i+1)%batch_size==0){
+            nn.apply_grad();
+        }
+        
     }
 }
 
@@ -59,11 +63,11 @@ int main(){
     DataSet testSet("data/t10k-images-idx3-ubyte","data/t10k-labels-idx1-ubyte");
 
     // create NN
-    nn.add(new Conv(16,3,&in));
+    nn.add(new Conv(16,3,1,&in));
     nn.add(new Relu(nn.lastOut()));
-    nn.add(new Conv(16,3,nn.lastOut()));
+    nn.add(new Conv(16,3,1,nn.lastOut()));
     nn.add(new Relu(nn.lastOut()));
-    nn.add(new MeanPool(nn.lastOut()));
+    nn.add(new MaxPool(nn.lastOut()));
     nn.add(new Flattern(nn.lastOut()));
     nn.add(new Fc(128,nn.lastOut()));
     nn.add(new Relu(nn.lastOut()));
@@ -72,6 +76,7 @@ int main(){
     nn.add(new LogSoftmax(nn.lastOut(),&label));
     
     nn.setLR(5e-3);
+    nn.setMomentum(0.9);
 
     nn.initData(0,0.1);
 

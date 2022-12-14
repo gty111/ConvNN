@@ -9,8 +9,9 @@ class Tensor{
     public:
     int size = 0;
     std::vector<int>shape;
-    T *_data=nullptr;
-    T *_grad=nullptr;
+    T *_data=nullptr; 
+    T *_grad=nullptr; // log gradient
+    T *_lgrad=nullptr; // log last gradient 
 
     void initData(double mean,double std){
         std::normal_distribution<double> dis(mean,std);
@@ -19,19 +20,23 @@ class Tensor{
         }
     }
 
+    void _allocData(){
+        _data = (T*)calloc(size,sizeof(T));
+        _grad = (T*)calloc(size,sizeof(T));
+        _lgrad = (T*)calloc(size,sizeof(T));
+    }
+
     Tensor(int a){
         shape.push_back(a);
         size = a;
-        _data = (T*)calloc(size,sizeof(T));
-        _grad = (T*)calloc(size,sizeof(T));
+        _allocData();
     }
 
     Tensor(int a,int b){
         shape.push_back(a);
         shape.push_back(b);
         size = a * b;
-        _data = (T*)calloc(size,sizeof(T));
-        _grad = (T*)calloc(size,sizeof(T));
+        _allocData();
     }
 
     Tensor(int a,int b,int c){
@@ -39,8 +44,7 @@ class Tensor{
         shape.push_back(b);
         shape.push_back(c);
         size = a * b * c;
-        _data = (T*)calloc(size,sizeof(T));
-        _grad = (T*)calloc(size,sizeof(T));
+        _allocData();
     }
 
     Tensor(int a,int b,int c,int d){
@@ -49,8 +53,7 @@ class Tensor{
         shape.push_back(c);
         shape.push_back(d);
         size = a * b * c * d;
-        _data = (T*)calloc(size,sizeof(T));
-        _grad = (T*)calloc(size,sizeof(T));
+        _allocData();
     }
 
     T max(){
@@ -214,9 +217,17 @@ class Tensor{
         } 
     }
 
+    void printShape(){
+        for(auto e:shape){
+            printf("%d ",e);
+        }
+        printf("\n");
+    }
+
     ~Tensor(){
         if(_data)free(_data);
         if(_grad)free(_grad);
+        if(_lgrad)free(_lgrad);
     }
 };
 

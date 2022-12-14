@@ -6,55 +6,65 @@
 
 class NN{
 public:
-    double lr;
-    std::vector<Layer*>layers;
+    double _lr=1e-3;
+    double _momentum=0.9;
+    std::vector<Layer*>_layers;
 
     void add(Layer *layer){
-        layers.push_back(layer);
+        _layers.push_back(layer);
+        _layers.back()->_out->printShape();
     }
 
     Tensor<double>* lastOut(){
-        return layers.back()->_out;
+        assert(_layers.size()&&"first layer must bind input");
+        return _layers.back()->_out;
     }
 
     void apply_grad(){
-        for(auto e:layers){
+        for(auto e:_layers){
             e->apply_grad();
         }
     }
 
     int pred(){
-        auto layer = (LogSoftmax*)layers.back();
+        auto layer = (LogSoftmax*)_layers.back();
         return layer->_out->maxIdx();
     }
 
     double loss(){
-        auto layer = (LogSoftmax*)layers.back();
+        auto layer = (LogSoftmax*)_layers.back();
         return layer->_out->_data[*layer->_label];
     }
 
     void initData(double mean,double std){
-        for(auto e:layers){
+        for(auto e:_layers){
             e->initData(mean,std);
         }
     }
 
     void forward(){
-        for(auto e:layers){
+        for(auto e:_layers){
             e->forward();
         }
     }
 
     void backward(){
-        for(int i=layers.size()-1;i>=0;i--){
-            layers[i]->backward();
+        for(int i=_layers.size()-1;i>=0;i--){
+            _layers[i]->backward();
         }
     }
 
-    void setLR(double LR){
-        lr = LR;
-        for(auto e:layers){
-            e->learn_rate = lr;
+    void setLR(double lr){
+        _lr = lr;
+        for(auto e:_layers){
+            e->learn_rate = _lr;
+        }
+    }
+
+    void setMomentum(double momentum){
+        _momentum = momentum;
+        for(auto e:_layers){
+            e->momentum = _momentum;
         }
     }
 };

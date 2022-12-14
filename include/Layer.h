@@ -6,6 +6,7 @@
 class Layer{
 public:
     double learn_rate;
+    double momentum;
 
     Tensor<double> *_in = nullptr;
     Tensor<double> *_out = nullptr;
@@ -20,13 +21,15 @@ public:
     virtual void apply_grad(){
         if(_w){
             for(int i=0;i<(*_w).size;i++){
-                (*_w)._data[i] += (*_w)._grad[i];
+                (*_w)._lgrad[i] = (*_w)._lgrad[i]*momentum + (*_w)._grad[i];
+                (*_w)._data[i] += (*_w)._lgrad[i] * learn_rate;
                 (*_w)._grad[i] = 0;
             }
         }
         if(_b){
             for(int i=0;i<(*_b).size;i++){
-                (*_b)._data[i] += (*_b)._grad[i];
+                (*_b)._lgrad[i] = (*_b)._lgrad[i]*momentum + (*_b)._grad[i];
+                (*_b)._data[i] += (*_b)._lgrad[i] * learn_rate;
                 (*_b)._grad[i] = 0;
             }
         }
@@ -39,18 +42,30 @@ public:
 
 class Conv:public Layer{
 public:
-    Tensor<double> *_pad = nullptr;
+    bool _PAD;
+    Tensor<double> *_inpad = nullptr; // if PAD pad _in
+    Tensor<double> *_pad = nullptr; // to cal _in grad
 
-    Conv(int x,int y,Tensor<double>* in){
+    Conv(int x,int y,bool PAD,Tensor<double>* in){
         assert(in);
         assert((*in).shape.size()==3);
+        _PAD = PAD;
         _in = in;
         _w = new Tensor<double>(x,(*in).shape[0],y,y);
         _b = new Tensor<double>(x);
-        int t = (*in).shape[1]-y+1;
-        _out = new Tensor<double>(x,t,t);
-        t = (*_w).shape[2]+(*_in).shape[1]-1;
-        _pad = new Tensor<double>(x,t,t);
+        int t;
+        if(!PAD){
+            t = (*in).shape[1]-y+1;
+            _out = new Tensor<double>(x,t,t);
+            t = (*_w).shape[2]+(*_in).shape[1]-1;
+            _pad = new Tensor<double>(x,t,t);
+        }else{
+            t = (*in).shape[1];
+            _out = new Tensor<double>(x,t,t);
+            t = (*_w).shape[2]+(*_out).shape[1]-1;
+            _pad = new Tensor<double>(x,t,t);
+            _inpad = new Tensor<double>((*_in).shape[0],(*_in).shape[1]+2,(*_in).shape[2]+2);
+        }
     }
 
     ~Conv(){
@@ -73,11 +88,20 @@ public:
         assert((*_w).shape[0]==(*_b).shape[0]);
         assert((*_b).shape.size()==1);
         assert((*_out).shape[0]==(*_w).shape[0]);
-        assert((*_out).shape[1]==(*_in).shape[1]-(*_w).shape[2]+1);
-        assert((*_out).shape[2]==(*_in).shape[2]-(*_w).shape[3]+1);
         assert((*_pad).shape[0]==(*_w).shape[0]);
-        assert((*_pad).shape[1]==(*_w).shape[2]+(*_in).shape[1]-1);
-        assert((*_pad).shape[2]==(*_w).shape[3]+(*_in).shape[2]-1);
+        if(!_PAD){
+            assert((*_out).shape[1]==(*_in).shape[1]-(*_w).shape[2]+1);
+            assert((*_out).shape[2]==(*_in).shape[2]-(*_w).shape[3]+1);
+            assert((*_pad).shape[1]==(*_w).shape[2]+(*_in).shape[1]-1);
+            assert((*_pad).shape[2]==(*_w).shape[3]+(*_in).shape[2]-1);
+        }else{
+            assert((*_out).shape[1]==(*_in).shape[1]);
+            assert((*_out).shape[2]==(*_in).shape[2]);
+            assert((*_pad).shape[1]==(*_w).shape[2]+(*_inpad).shape[1]-1);
+            assert((*_pad).shape[2]==(*_w).shape[3]+(*_inpad).shape[2]-1);
+        }
+        
+        
     }
 
     virtual void forward(){
@@ -85,21 +109,48 @@ public:
         check();
         #endif
 
-        for(int i=0;i<(*_w).shape[0];i++){
-            for(int m=0;m<(*_out).shape[1];m++){
-                for(int n=0;n<(*_out).shape[2];n++){
-                    double sum = 0;
-                    for(int j=0;j<(*_w).shape[1];j++){
-                        for(int p=0;p<(*_w).shape[2];p++){
-                            for(int q=0;q<(*_w).shape[3];q++){
-                                sum += *(*_in).data(j,m+p,n+q) * (*(*_w).data(i,j,p,q));
-                            }    
+        if(!_PAD){
+            for(int i=0;i<(*_w).shape[0];i++){
+                for(int m=0;m<(*_out).shape[1];m++){
+                    for(int n=0;n<(*_out).shape[2];n++){
+                        double sum = 0;
+                        for(int j=0;j<(*_w).shape[1];j++){
+                            for(int p=0;p<(*_w).shape[2];p++){
+                                for(int q=0;q<(*_w).shape[3];q++){
+                                    sum += *(*_in).data(j,m+p,n+q) * (*(*_w).data(i,j,p,q));
+                                }    
+                            }
                         }
+                        *(*_out).data(i,m,n) = sum + (*(*_b).data(i));
                     }
-                    *(*_out).data(i,m,n) = sum + (*(*_b).data(i));
                 }
             }
-        }
+        }else{
+            // cal _inpad
+            for(int i=0;i<(*_in).shape[0];i++){
+                for(int j=0;j<(*_in).shape[1];j++){
+                    for(int k=0;k<(*_in).shape[2];k++){
+                        *(*_inpad).data(i,j+((*_w).shape[2]-1)/2,k+((*_w).shape[3]-1)/2) = *(*_in).data(i,j,k);
+                    }
+                }
+            }
+            // conv
+            for(int i=0;i<(*_w).shape[0];i++){
+                for(int m=0;m<(*_out).shape[1];m++){
+                    for(int n=0;n<(*_out).shape[2];n++){
+                        double sum = 0;
+                        for(int j=0;j<(*_w).shape[1];j++){
+                            for(int p=0;p<(*_w).shape[2];p++){
+                                for(int q=0;q<(*_w).shape[3];q++){
+                                    sum += *(*_inpad).data(j,m+p,n+q) * (*(*_w).data(i,j,p,q));
+                                }    
+                            }
+                        }
+                        *(*_out).data(i,m,n) = sum + (*(*_b).data(i));
+                    }
+                }
+            }
+        }   
     }
 
     virtual void backward(){
@@ -107,52 +158,111 @@ public:
         check();
         #endif
 
-        // cal _in grad
-        for(int i=0;i<(*_out).shape[0];i++){
-            for(int j=0;j<(*_out).shape[1];j++){
-                for(int k=0;k<(*_out).shape[2];k++){
-                    *(*_pad).data(i,j+2,k+2) = *(*_out).grad(i,j,k);
-                }
-            }
-        }
-        for(int i=0;i<(*_in).shape[0];i++){
-            for(int j=0;j<(*_in).shape[1];j++){
-                for(int k=0;k<(*_in).shape[2];k++){
-                    double sum = 0;
-                    for(int m=0;m<(*_w).shape[0];m++){
-                        for(int p=0;p<(*_w).shape[2];p++){
-                            for(int q=0;q<(*_w).shape[3];q++){
-                                sum += *(*_pad).data(m,j+p,k+q) * (*(*_w).data(m,i,2-p,2-q));
-                            }
-                        }
+        if(!_PAD){
+            // cal _in grad
+            for(int i=0;i<(*_out).shape[0];i++){
+                for(int j=0;j<(*_out).shape[1];j++){
+                    for(int k=0;k<(*_out).shape[2];k++){
+                        *(*_pad).data(i,j+(*_w).shape[2]-1,k+(*_w).shape[3]-1) = *(*_out).grad(i,j,k);
                     }
-                    *(*_in).grad(i,j,k) = sum;
                 }
             }
-        }
-
-        // cal _w grad
-        for(int i=0;i<(*_w).shape[0];i++){
-            for(int j=0;j<(*_w).shape[1];j++){
-                for(int p=0;p<(*_w).shape[2];p++){
-                    for(int q=0;q<(*_w).shape[3];q++){
+            for(int i=0;i<(*_in).shape[0];i++){
+                for(int j=0;j<(*_in).shape[1];j++){
+                    for(int k=0;k<(*_in).shape[2];k++){
                         double sum = 0;
-                        for(int m=0;m<(*_out).shape[1];m++){
-                            for(int n=0;n<(*_out).shape[2];n++){
-                                sum += *(*_in).data(j,m+p,n+q) * (*(*_out).grad(i,m,n));
+                        for(int m=0;m<(*_w).shape[0];m++){
+                            for(int p=0;p<(*_w).shape[2];p++){
+                                for(int q=0;q<(*_w).shape[3];q++){
+                                    sum += *(*_pad).data(m,j+p,k+q) * (*(*_w).data(m,i,(*_w).shape[2]-1-p,(*_w).shape[3]-1-q));
+                                }
                             }
                         }
-                        *(*_w).grad(i,j,p,q) += sum * this->learn_rate;
+                        *(*_in).grad(i,j,k) = sum;
                     }
                 }
             }
-        }
 
-        // cal _b grad
-        for(int i=0;i<(*_out).shape[0];i++){
-            for(int j=0;j<(*_out).shape[1];j++){
-                for(int k=0;k<(*_out).shape[2];k++){
-                    *(*_b).grad(i) += *(*_out).grad(i,j,k) * this->learn_rate;    
+            // cal _w grad
+            for(int i=0;i<(*_w).shape[0];i++){
+                for(int j=0;j<(*_w).shape[1];j++){
+                    for(int p=0;p<(*_w).shape[2];p++){
+                        for(int q=0;q<(*_w).shape[3];q++){
+                            double sum = 0;
+                            for(int m=0;m<(*_out).shape[1];m++){
+                                for(int n=0;n<(*_out).shape[2];n++){
+                                    sum += *(*_in).data(j,m+p,n+q) * (*(*_out).grad(i,m,n));
+                                }
+                            }
+                            *(*_w).grad(i,j,p,q) += sum * this->learn_rate;
+                        }
+                    }
+                }
+            }
+
+            // cal _b grad
+            for(int i=0;i<(*_out).shape[0];i++){
+                for(int j=0;j<(*_out).shape[1];j++){
+                    for(int k=0;k<(*_out).shape[2];k++){
+                        *(*_b).grad(i) += *(*_out).grad(i,j,k) * this->learn_rate;    
+                    }
+                }
+            }
+        }else{
+            // cal _in grad
+            for(int i=0;i<(*_out).shape[0];i++){
+                for(int j=0;j<(*_out).shape[1];j++){
+                    for(int k=0;k<(*_out).shape[2];k++){
+                        *(*_pad).data(i,j+(*_w).shape[2],k+(*_w).shape[3]) = *(*_out).grad(i,j,k);
+                    }
+                }
+            }
+            for(int i=0;i<(*_inpad).shape[0];i++){
+                for(int j=0;j<(*_inpad).shape[1];j++){
+                    for(int k=0;k<(*_inpad).shape[2];k++){
+                        double sum = 0;
+                        for(int m=0;m<(*_w).shape[0];m++){
+                            for(int p=0;p<(*_w).shape[2];p++){
+                                for(int q=0;q<(*_w).shape[3];q++){
+                                    sum += *(*_pad).data(m,j+p,k+q) * (*(*_w).data(m,i,(*_w).shape[2]-1-p,(*_w).shape[3]-1-q));
+                                }
+                            }
+                        }
+                        *(*_inpad).grad(i,j,k) = sum;
+                    }
+                }
+            }
+            for(int i=0;i<(*_in).shape[0];i++){
+                for(int j=0;j<(*_in).shape[1];j++){
+                    for(int k=0;k<(*_in).shape[2];k++){
+                        *(*_in).grad(i,j,k) = *(*_inpad).grad(i,j+((*_w).shape[2]-1)/2,k+((*_w).shape[3]-1)/2);
+                    }
+                }
+            }
+
+            // cal _w grad
+            for(int i=0;i<(*_w).shape[0];i++){
+                for(int j=0;j<(*_w).shape[1];j++){
+                    for(int p=0;p<(*_w).shape[2];p++){
+                        for(int q=0;q<(*_w).shape[3];q++){
+                            double sum = 0;
+                            for(int m=0;m<(*_out).shape[1];m++){
+                                for(int n=0;n<(*_out).shape[2];n++){
+                                    sum += *(*_inpad).data(j,m+p,n+q) * (*(*_out).grad(i,m,n));
+                                }
+                            }
+                            *(*_w).grad(i,j,p,q) += sum * this->learn_rate;
+                        }
+                    }
+                }
+            }
+
+            // cal _b grad
+            for(int i=0;i<(*_out).shape[0];i++){
+                for(int j=0;j<(*_out).shape[1];j++){
+                    for(int k=0;k<(*_out).shape[2];k++){
+                        *(*_b).grad(i) += *(*_out).grad(i,j,k) * this->learn_rate;    
+                    }
                 }
             }
         }
@@ -273,72 +383,84 @@ public:
     }
 };
 
-// TODO debug MaxPool backward
-// class MaxPool:public Layer{
-// public:
-//     MaxPool(Tensor<double>*in){
-//         assert(in);
-//         assert((*in).shape.size()==3);
-//         assert((*in).shape[1]%2==0);
-//         assert((*in).shape[2]%2==0);
-//         _in = in;
-//         _out = new Tensor<double>((*in).shape[0],(*in).shape[1]/2,(*in).shape[2]/2);
-//     }
+class MaxPool:public Layer{
+public:
 
-//     ~MaxPool(){
-//         delete _out;
-//     }
+    Tensor<uint8_t> *_max; // log max index
 
-//     virtual void check(){
-//         assert(_in);
-//         assert(_out);
-//         assert((*_out).shape.size()==3);
-//         assert((*_in).shape.size()==3);
-//         assert((*_out).shape[0]==(*_in).shape[0]);
-//         assert((*_out).shape[1]==(*_in).shape[1]/2);
-//         assert((*_out).shape[2]==(*_in).shape[2]/2);
-//     }
-//     virtual void forward(){
-//         #ifdef DEBUG
-//         check();
-//         #endif
+    MaxPool(Tensor<double>*in){
+        in->printShape();
+        assert(in);
+        assert((*in).shape.size()==3);
+        assert((*in).shape[1]%2==0);
+        assert((*in).shape[2]%2==0);
+        _in = in;
+        _out = new Tensor<double>((*in).shape[0],(*in).shape[1]/2,(*in).shape[2]/2);
+        _max = new Tensor<uint8_t>((*_out).shape[0],(*_out).shape[1],(*_out).shape[2]);
+    }
 
-//         for(int k=0;k<(*_out).shape[0];k++){
-//             for(int i=0;i<(*_out).shape[1];i++){
-//                 for(int j=0;j<(*_out).shape[2];j++){
-//                     double t = *(*_in).data(k,i*2,j*2);
-//                     t = std::max(t,*(*_in).data(k,i*2,j*2+1));
-//                     t = std::max(t,*(*_in).data(k,i*2+1,j*2));
-//                     t = std::max(t,*(*_in).data(k,i*2+1,j*2+1));
-//                     *(*_out).data(k,i,j) = t;
-//                 }
-//             }
-//         }
-//     }
+    ~MaxPool(){
+        delete _out;
+    }
 
-//     virtual void backward(){
-//         #ifdef DEBUG
-//         check();
-//         #endif
+    virtual void check(){
+        assert(_in);
+        assert(_out);
+        assert((*_out).shape.size()==3);
+        assert((*_in).shape.size()==3);
+        assert((*_out).shape[0]==(*_in).shape[0]);
+        assert((*_out).shape[1]==(*_in).shape[1]/2);
+        assert((*_out).shape[2]==(*_in).shape[2]/2);
+    }
+    virtual void forward(){
+        #ifdef DEBUG
+        check();
+        #endif
 
-//         // cal _in grad
-//         for(int k=0;k<(*_in).shape[0];k++){
-//             for(int i=0;i<(*_in).shape[1];i++){
-//                 for(int j=0;j<(*_in).shape[2];j++){
-//                     if((*(*_in).data(k,i,j)>*(*_in).data(k,i/2*2,j/2*2)   &&
-//                        *(*_in).data(k,i,j)>*(*_in).data(k,i/2*2,j/2*2+1) && 
-//                        *(*_in).data(k,i,j)>*(*_in).data(k,i/2*2+1,j/2*2) &&
-//                        *(*_in).data(k,i,j)>*(*_in).data(k,i/2*2+1,j/2*2+1)){
+        for(int k=0;k<(*_out).shape[0];k++){
+            for(int i=0;i<(*_out).shape[1];i++){
+                for(int j=0;j<(*_out).shape[2];j++){
+                    *(*_out).data(k,i,j) = *(*_in).data(k,i*2,j*2);
+                    *(*_max).data(k,i,j) = 0;
+                    if(*(*_in).data(k,i*2+1,j*2)>*(*_out).data(k,i,j)){
+                        *(*_out).data(k,i,j) = *(*_in).data(k,i*2+1,j*2);
+                        *(*_max).data(k,i,j) = 1;
+                    }
+                    if(*(*_in).data(k,i*2,j*2+1)>*(*_out).data(k,i,j)){
+                        *(*_out).data(k,i,j) = *(*_in).data(k,i*2,j*2+1);
+                        *(*_max).data(k,i,j) = 2;
+                    }
+                    if(*(*_in).data(k,i*2+1,j*2+1)>*(*_out).data(k,i,j)){
+                        *(*_out).data(k,i,j) = *(*_in).data(k,i*2+1,j*2+1);
+                        *(*_max).data(k,i,j) = 3;
+                    }
+                }
+            }
+        }
 
-//                         *(*_in).grad(k,i,j) = *(*_out).grad(k,i/2,j/2);
-//                     }else {
-//                         *(*_in).grad(k,i,j) = 0;
-//                     }       
-//                 }
-//             }
-//         }
-//     }
-// };
+    }
+
+    virtual void backward(){
+        #ifdef DEBUG
+        check();
+        #endif
+
+        // cal _in grad
+        for(int k=0;k<(*_out).shape[0];k++){
+            for(int i=0;i<(*_out).shape[1];i++){
+                for(int j=0;j<(*_out).shape[2];j++){
+                    switch(*(*_max).data(k,i,j)){
+                    case 0: *(*_out).grad(k,i,j) = *(*_in).grad(k,i*2,j*2);break;
+                    case 1: *(*_out).grad(k,i,j) = *(*_in).grad(k,i*2+1,j*2);break;
+                    case 2: *(*_out).grad(k,i,j) = *(*_in).grad(k,i*2,j*2+1);break;
+                    case 3: *(*_out).grad(k,i,j) = *(*_in).grad(k,i*2+1,j*2+1);break;
+                    default:assert(0);
+                    }   
+                }
+            }
+        }
+    }
+};
 
 class MeanPool:public Layer{
 public:

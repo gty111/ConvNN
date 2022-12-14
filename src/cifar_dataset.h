@@ -42,19 +42,19 @@ class DataSet{
                 for(int k=0;k<3072;k++){
                     _image_train[idx*3072+k] = (double)_image_byte_train[idx*3072+k]/255;
                 }
-                // double sum0=0,sum1=0,mean,std;
-                // for(int k=0;k<3072;k++){
-                //     _image_train[idx*3072+k] = (double)_image_byte_train[idx*3072+k];
-                //     sum0 += _image_byte_train[idx*3072+k];
-                // }
-                // mean = sum0/3072;
-                // for(int k=0;k<3072;k++){
-                //     sum1 += std::pow(_image_train[idx*3072+k]-mean,2);
-                // }
-                // std = std::sqrt(sum1/3072);
-                // for(int k=0;k<3072;k++){
-                //     _image_train[idx*3072+k] = (_image_train[idx*3072+k]-mean) / std;
-                // }
+                double sum0=0,sum1=0,mean,std;
+                for(int k=0;k<3072;k++){
+                    _image_train[idx*3072+k] = (double)_image_byte_train[idx*3072+k];
+                    sum0 += _image_byte_train[idx*3072+k];
+                }
+                mean = sum0/3072;
+                for(int k=0;k<3072;k++){
+                    sum1 += std::pow(_image_train[idx*3072+k]-mean,2);
+                }
+                std = std::sqrt(sum1/3072);
+                for(int k=0;k<3072;k++){
+                    _image_train[idx*3072+k] = (_image_train[idx*3072+k]-mean) / std;
+                }
             }
             fclose(fp);
         }
@@ -66,19 +66,19 @@ class DataSet{
             for(int k=0;k<3072;k++){
                 _image_test[j*3072+k] = (double)_image_byte_test[j*3072+k]/255;
             }
-            // double sum0=0,sum1=0,mean,std;
-            // for(int k=0;k<3072;k++){
-            //     _image_test[j*3072+k] = (double)_image_byte_test[j*3072+k];
-            //     sum0 += _image_byte_test[j*3072+k];
-            // }
-            // mean = sum0/3072;
-            // for(int k=0;k<3072;k++){
-            //     sum1 += std::pow(_image_test[j*3072+k]-mean,2);
-            // }
-            // std = std::sqrt(sum1/3072);
-            // for(int k=0;k<3072;k++){
-            //     _image_test[j*3072+k] = (_image_test[j*3072+k]-mean) / std;
-            // }
+            double sum0=0,sum1=0,mean,std;
+            for(int k=0;k<3072;k++){
+                _image_test[j*3072+k] = (double)_image_byte_test[j*3072+k];
+                sum0 += _image_byte_test[j*3072+k];
+            }
+            mean = sum0/3072;
+            for(int k=0;k<3072;k++){
+                sum1 += std::pow(_image_test[j*3072+k]-mean,2);
+            }
+            std = std::sqrt(sum1/3072);
+            for(int k=0;k<3072;k++){
+                _image_test[j*3072+k] = (_image_test[j*3072+k]-mean) / std;
+            }
         }
         fclose(fp);
     }
