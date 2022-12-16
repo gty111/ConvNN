@@ -4,15 +4,15 @@
 #include<cassert>
 #include<cmath>
 
-class DataSet{
+class MNIST_DataSet{
     public:
     std::string imagePath,labelPath;
     int rows,cols,items_num;
-    double *_image=nullptr;
+    float *_image=nullptr;
     uint8_t *_image_byte=nullptr;
     uint8_t *label=nullptr;
 
-    double *image(int idx_item,int idx_row,int idx_col){
+    float *image(int idx_item,int idx_row,int idx_col){
         assert(idx_item>=0&&idx_item<items_num);
         assert(idx_row>=0&&idx_row<rows);
         assert(idx_col>=0&&idx_col<cols);
@@ -26,7 +26,7 @@ class DataSet{
         return &_image_byte[idx_item*rows*cols+idx_row*cols+idx_col];
     }
 
-    DataSet (std::string imagePath,std::string labelPath){
+    MNIST_DataSet (std::string imagePath,std::string labelPath){
         this->imagePath = imagePath;
         this->labelPath = labelPath;
 
@@ -48,11 +48,12 @@ class DataSet{
 
         assert(magic_num==0x00000803);
         
-        _image = (double*)malloc(items_num*rows*cols*sizeof(double));
         _image_byte = (uint8_t*)malloc(items_num*rows*cols*sizeof(uint8_t));
 
+        cudaMallocManaged(&_image,items_num*rows*cols*sizeof(float));
+
         for(int k=0;k<items_num;k++){
-            double sum0=0,sum1=0,mean,std;
+            float sum0=0,sum1=0,mean,std;
             for(int i=0;i<rows;i++){
                 for(int j=0;j<cols;j++){
                     fread(imageByte(k,i,j),1,1,fp);
@@ -89,7 +90,7 @@ class DataSet{
         assert(magic_num==0x00000801);
         assert(label_items_num==items_num);
 
-        label = (uint8_t*)malloc(items_num);
+        cudaMallocManaged(&label,items_num*sizeof(uint8_t));
         for(int i=0;i<items_num;i++){
             fread(&label[i],1,1,fp);
         }
@@ -118,10 +119,10 @@ class DataSet{
         return ret;
     }
 
-    ~DataSet(){
-        free(_image);
+    ~MNIST_DataSet(){
+        cudaFree(_image);
         free(_image_byte);
-        free(label);
+        cudaFree(label);
     }
 };
 

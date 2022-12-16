@@ -6,8 +6,8 @@
 
 
 std::random_device rd;  //Will be used to obtain a seed for the random number engine
-int seed = 0;
-std::mt19937 gen(seed); //Standard mersenne_twister_engine seeded with rd()
+int SEED= 0;
+std::mt19937 gen(SEED); //Standard mersenne_twister_engine seeded with rd()
 
 class Random{
     public:
@@ -21,6 +21,10 @@ class Random{
         std::shuffle(_arr , _arr+size , gen);
         _idx = -1;
         _size = size;
+    }
+
+    void shuffle(){
+        std::shuffle(_arr, _arr+_size , gen);
     }
 
     int next(){

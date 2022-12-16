@@ -3,6 +3,7 @@
 #include<vector>
 #include<cassert>
 #include"myRandom.h"
+#include"helper_cuda.h"
 
 template<typename T>
 class Tensor{
@@ -10,50 +11,64 @@ class Tensor{
     int size = 0;
     std::vector<int>shape;
     T *_data=nullptr; 
-    T *_grad=nullptr; // log gradient
-    T *_lgrad=nullptr; // log last gradient 
+    T *_grad=nullptr;
+    T *_lgrad=nullptr;
+    bool _alloc=0;
+    bool _init_data=0;
 
     void initData(double mean,double std){
+        if(!_init_data){
+            std::normal_distribution<double> dis(mean,std);
+            for(int i=0;i<size;i++){
+                _data[i] = dis(gen);
+                _lgrad[i] = 0;
+            }
+            _init_data = 1;
+        }
+    }
+
+    void initGrad(double mean,double std){
         std::normal_distribution<double> dis(mean,std);
         for(int i=0;i<size;i++){
-            _data[i] = dis(gen);
+            _grad[i] = dis(gen);
         }
     }
 
     void _allocData(){
-        _data = (T*)calloc(size,sizeof(T));
-        _grad = (T*)calloc(size,sizeof(T));
-        _lgrad = (T*)calloc(size,sizeof(T));
+        _alloc = 1;
+        CudaSafeCall( cudaMallocManaged(&_data,size*sizeof(T)) );
+        CudaSafeCall( cudaMallocManaged(&_grad,size*sizeof(T)) );
+        CudaSafeCall( cudaMallocManaged(&_lgrad,size*sizeof(T)) );
     }
 
-    Tensor(int a){
+    Tensor(int a,bool alloc=1){
         shape.push_back(a);
         size = a;
-        _allocData();
+        if(alloc)_allocData();
     }
 
-    Tensor(int a,int b){
+    Tensor(int a,int b,bool alloc=1){
         shape.push_back(a);
         shape.push_back(b);
         size = a * b;
-        _allocData();
+        if(alloc)_allocData();
     }
 
-    Tensor(int a,int b,int c){
+    Tensor(int a,int b,int c,bool alloc=1){
         shape.push_back(a);
         shape.push_back(b);
         shape.push_back(c);
         size = a * b * c;
-        _allocData();
+        if(alloc)_allocData();
     }
 
-    Tensor(int a,int b,int c,int d){
+    Tensor(int a,int b,int c,int d,bool alloc=1){
         shape.push_back(a);
         shape.push_back(b);
         shape.push_back(c);
         shape.push_back(d);
         size = a * b * c * d;
-        _allocData();
+        if(alloc)_allocData();
     }
 
     T max(){
@@ -169,9 +184,24 @@ class Tensor{
         }
     }
 
+    void printTot(){
+        printf("---------------\n");
+        for(int i=0;i<size;i++){
+            printf("%d:% 5.6f\n",i,_data[i]);
+        }
+    }
+
     void print(){
         printf("---------------\n");
-        if(shape.size()==3){
+        if(shape.size()==4){
+            for(int k=0;k<shape[1];k++)
+            for(int i=0;i<shape[2];i++){
+                for(int j=0;j<shape[3];j++){
+                    printf("% 5.6f ",*(data(0,k,i,j)));
+                }
+                printf("\n");
+            }
+        }else if(shape.size()==3){
             // for(int k=0;k<shape[0];k++)
             for(int i=0;i<shape[1];i++){
                 for(int j=0;j<shape[2];j++){
@@ -193,9 +223,24 @@ class Tensor{
         } 
     }
 
+    void printGradTot(){
+        printf("---------------\n");
+        for(int i=0;i<size;i++){
+            printf("% 5.6f\n",_grad[i]);
+        }
+    }
+
     void printgrad(){
         printf("---------------\n");
-        if(shape.size()==3){
+        if(shape.size()==4){
+            for(int k=0;k<shape[1];k++)
+            for(int i=0;i<shape[2];i++){
+                for(int j=0;j<shape[3];j++){
+                    printf("% 5.6f ",*(grad(0,k,i,j)));
+                }
+                printf("\n");
+            }
+        }else if(shape.size()==3){
             // for(int k=0;k<shape[0];k++)
             for(int i=0;i<shape[1];i++){
                 for(int j=0;j<shape[2];j++){
@@ -219,15 +264,14 @@ class Tensor{
 
     void printShape(){
         for(auto e:shape){
-            printf("%d ",e);
+            printf("%4d ",e);
         }
         printf("\n");
     }
 
     ~Tensor(){
-        if(_data)free(_data);
-        if(_grad)free(_grad);
-        if(_lgrad)free(_lgrad);
+        if(_alloc)cudaFree(_data);
+        if(_alloc)cudaFree(_grad);
     }
 };
 

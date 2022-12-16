@@ -2,23 +2,26 @@ APP = conv
 SRC = src
 BIN = bin
 DATA = data
-FLAG = -I include -O3 -Wall -Wextra $^ -o $(BIN)/$@ 
+CUDNN ?= $(shell spack location -i cudnn)
+INC = $(CUDNN)/include $(shell pwd)/include $(OPENCV)/include/opencv4
+LIB = $(CUDNN)/lib
+FLAG = $(addprefix -I,$(INC)) $(addprefix -L,$(LIB)) -lcudnn 
 
-mnist: $(SRC)/mnist.cpp
-	@g++ $(CXXFLAG) $(FLAG)
-	@$(BIN)/$@ | tee log
+TEST_LAYER = fc act pool softmax batchnorm
+TEST_OPENCV = cifar_cv
+EXAMPLE = cifar mnist 
 
-Dmnist: $(SRC)/mnist.cpp
-	@g++ -g -D DEBUG $(CXXFLAG) $(FLAG)
-	@$(BIN)/$@ | tee log
+$(EXAMPLE):%:
+	@nvcc src/$@.cu $(FLAG) $^ -o $(BIN)/$@ 
+	./$(BIN)/$@ | tee log
 
-cifar: $(SRC)/cifar.cpp
-	@g++ $(CXXFLAG) $(FLAG)
-	@$(BIN)/$@ | tee log
+$(TEST_LAYER):%:
+	@nvcc -g $(FLAG) test_layer/$@.cu -o $(BIN)/$@
+	./$(BIN)/$@
 
-Dcifar: $(SRC)/cifar.cpp
-	@g++ -g -D DEBUG $(CXXFLAG) $(FLAG)
-	@$(BIN)/$@ | tee log
+$(TEST_OPENCV):%:
+	@nvcc $(FLAG) test_opencv/$@.cu -o $(BIN)/$@
+	./$(BIN)/$@
 
 data:
 	$(shell [ ! -d $(DATA) ] && mkdir $(DATA))
@@ -35,4 +38,4 @@ data:
 
 clean:
 	@rm -rf data bin
-.PHONY: data mnist cifar clean test_layer
+.PHONY: data run
