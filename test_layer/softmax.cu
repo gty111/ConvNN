@@ -6,7 +6,9 @@ int main(){
     in.initData(0,1);
     in.printTot();
 
-    int label = 2;
+    Tensor<uint8_t> label(2);
+    label._data[0] = 1;
+    label._data[1] = 2;
 
     Softmax *conv = new Softmax(&in,&label);
     conv->forward();

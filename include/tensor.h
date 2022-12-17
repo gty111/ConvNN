@@ -187,7 +187,7 @@ class Tensor{
     void printTot(){
         printf("---------------\n");
         for(int i=0;i<size;i++){
-            printf("%d:% 5.6f\n",i,_data[i]);
+            printf("% 5.6f\n",_data[i]);
         }
     }
 
