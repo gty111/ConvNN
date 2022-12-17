@@ -40,13 +40,13 @@ make data
 > At each run, the standard output will be recorded in the `log` file
 
 ### MNIST
-> you can find log (which I run) at runlog/mnist_log
+> you can find log (which I run) at [here](runlog/mnist_log)
 ```
 make mnist
 ```
 
 ### CIFAR
-> you can find log (which I run) at runlog/cifar_log
+> you can find log (which I run) at [here](runlog/cifar_log)
 ```
 make cifar
 ```
