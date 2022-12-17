@@ -22,6 +22,7 @@
 
 - CUDA 
 - CUDNN
+- CUBLAS
 - GPU support CUDA and CUDNN
 
 before run anything 
