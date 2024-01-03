@@ -10,7 +10,7 @@
 
 ## Doc
 
-[You can find document about this repo from here.](https://gty111.github.io/doc/A%20Convolutional%20Neural%20Network%20Framework%20support%20on%20CPU%20and%20GPU.pdf)
+[You can find document about this repo from here.](https://gty111.github.io/info/doc/A%20Convolutional%20Neural%20Network%20Framework%20support%20on%20CPU%20and%20GPU.pdf)
 
 ## Prepare Data Set
 
